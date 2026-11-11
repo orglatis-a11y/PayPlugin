@@ -16,6 +16,9 @@ import java.util.stream.Collectors;
 
 public class PayPlugin extends JavaPlugin implements CommandExecutor, TabCompleter {
 
+    private static final LegacyComponentSerializer LEGACY =
+            LegacyComponentSerializer.builder().character('&').hexColors().build();
+
     private Economy econ;
 
     @Override
@@ -32,19 +35,16 @@ public class PayPlugin extends JavaPlugin implements CommandExecutor, TabComplet
         getCommand("pay").setTabCompleter(this);
     }
 
-    private Component prefix() {
-        return LegacyComponentSerializer.legacyAmpersand().deserialize(getConfig().getString("prefix", ""));
+    // Builds a message from config with %player% and %amount%
+    private Component msg(String key, String def, String player, String amount) {
+        String raw = getConfig().getString(key, def)
+                .replace("%player%", player)
+                .replace("%amount%", amount);
+        return LEGACY.deserialize(raw);
     }
 
-    // white text, green "$", white amount (like the screenshot)
-    private Component line(String text, String amount) {
-        return Component.text(text, NamedTextColor.WHITE)
-                .append(Component.text("$", NamedTextColor.GREEN))
-                .append(Component.text(" " + amount, NamedTextColor.WHITE));
-    }
-
-    private Component err(String msg) {
-        return prefix().append(Component.text(msg, NamedTextColor.RED));
+    private Component err(String text) {
+        return Component.text(text, NamedTextColor.RED);
     }
 
     @Override
@@ -96,17 +96,15 @@ public class PayPlugin extends JavaPlugin implements CommandExecutor, TabComplet
         String amt = format(amount);
         String targetName = target.getName() != null ? target.getName() : args[0];
 
-        // Sender: "You paid <player> $ <amount>"
-        Component sent = line("You paid " + targetName + " ", amt);
-        p.sendMessage(prefix().append(sent));
-        p.sendActionBar(Component.text("You paid " + targetName + " $ " + amt, NamedTextColor.GREEN));
+        // You paid someone
+        p.sendMessage(msg("chat-sent", "&fYou paid %player% &a$ &f%amount%", targetName, amt));
+        p.sendActionBar(msg("actionbar-sent", "&aYou paid %player% $ %amount%", targetName, amt));
 
-        // Receiver (only if online): "<player> paid you $ <amount>"
+        // Someone paid you (if online)
         Player online = target.getPlayer();
         if (online != null) {
-            Component got = line(p.getName() + " paid you ", amt);
-            online.sendMessage(prefix().append(got));
-            online.sendActionBar(Component.text(p.getName() + " paid you $ " + amt, NamedTextColor.GREEN));
+            online.sendMessage(msg("chat-received", "&f%player% paid you &a$ &f%amount%", p.getName(), amt));
+            online.sendActionBar(msg("actionbar-received", "&a%player% paid you $ %amount%", p.getName(), amt));
         }
         return true;
     }
