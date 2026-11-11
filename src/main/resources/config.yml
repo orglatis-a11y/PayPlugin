@@ -1,2 +1,11 @@
-# Legacy color codes (&) supported. Leave empty for no prefix.
-prefix: ""
+# Color codes use &  (&a = lime, &f = white, &l = bold)
+# Hex colors work too: &#55FF55
+# Placeholders: %player% and %amount%
+
+# When someone pays YOU
+chat-received: "&f%player% paid you &a$ &f%amount%"
+actionbar-received: "&a%player% paid you $ %amount%"
+
+# When YOU pay someone
+chat-sent: "&fYou paid %player% &a$ &f%amount%"
+actionbar-sent: "&aYou paid %player% $ %amount%"
