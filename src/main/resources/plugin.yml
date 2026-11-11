@@ -1,0 +1,9 @@
+name: PayPlugin
+version: 1.0
+main: me.pay.PayPlugin
+api-version: "1.20"
+depend: [Vault]
+commands:
+  pay:
+    description: Pay another player
+    usage: /pay <player> <amount>
