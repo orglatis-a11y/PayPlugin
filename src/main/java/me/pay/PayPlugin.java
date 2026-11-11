@@ -5,6 +5,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -47,6 +48,7 @@ public class PayPlugin extends JavaPlugin implements CommandExecutor, TabComplet
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (!(sender instanceof Player p)) {
             sender.sendMessage("Players only.");
@@ -56,15 +58,22 @@ public class PayPlugin extends JavaPlugin implements CommandExecutor, TabComplet
             p.sendMessage(err("Usage: /pay <player> <amount>"));
             return true;
         }
-        Player target = Bukkit.getPlayerExact(args[0]);
+
+        // Online or offline (must have joined before)
+        OfflinePlayer target = Bukkit.getPlayerExact(args[0]);
+        if (target == null) {
+            OfflinePlayer off = Bukkit.getOfflinePlayer(args[0]);
+            if (off.hasPlayedBefore()) target = off;
+        }
         if (target == null) {
             p.sendMessage(err("Player not found."));
             return true;
         }
-        if (target.equals(p)) {
+        if (target.getUniqueId().equals(p.getUniqueId())) {
             p.sendMessage(err("You can't pay yourself."));
             return true;
         }
+
         double amount = parseAmount(args[1]);
         if (amount <= 0) {
             p.sendMessage(err("Invalid amount."));
@@ -78,19 +87,27 @@ public class PayPlugin extends JavaPlugin implements CommandExecutor, TabComplet
             p.sendMessage(err("Payment failed."));
             return true;
         }
-        econ.depositPlayer(target, amount);
+        if (!econ.depositPlayer(target, amount).transactionSuccess()) {
+            econ.depositPlayer(p, amount); // refund
+            p.sendMessage(err("Payment failed."));
+            return true;
+        }
 
         String amt = format(amount);
+        String targetName = target.getName() != null ? target.getName() : args[0];
 
         // Sender: "You paid <player> $ <amount>"
-        Component sent = line("You paid " + target.getName() + " ", amt);
+        Component sent = line("You paid " + targetName + " ", amt);
         p.sendMessage(prefix().append(sent));
-        p.sendActionBar(Component.text("You paid " + target.getName() + " $ " + amt, NamedTextColor.GREEN));
+        p.sendActionBar(Component.text("You paid " + targetName + " $ " + amt, NamedTextColor.GREEN));
 
-        // Receiver: "<player> paid you $ <amount>"
-        Component got = line(p.getName() + " paid you ", amt);
-        target.sendMessage(prefix().append(got));
-        target.sendActionBar(Component.text(p.getName() + " paid you $ " + amt, NamedTextColor.GREEN));
+        // Receiver (only if online): "<player> paid you $ <amount>"
+        Player online = target.getPlayer();
+        if (online != null) {
+            Component got = line(p.getName() + " paid you ", amt);
+            online.sendMessage(prefix().append(got));
+            online.sendActionBar(Component.text(p.getName() + " paid you $ " + amt, NamedTextColor.GREEN));
+        }
         return true;
     }
 
